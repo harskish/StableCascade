@@ -1,0 +1,24 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Interactive",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/interactive.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Latent space viz",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/latent_space_viz.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        }
+    ]
+}

@@ -65,19 +65,20 @@ class DataCore(WarpCore):
                     dataset_path = yaml.safe_load(file)
             return setup_webdataset_path(dataset_path, cache_path=f"{self.config.experiment_id}_webdataset_cache.yml")
 
-    def webdataset_preprocessors(self, extras: Extras):
-        def identity(x):
-            if isinstance(x, bytes):
-                x = x.decode('utf-8')
-            return x
+    def base_identity(self,x):
+        if isinstance(x, bytes):
+            x = x.decode('utf-8')
+        return x
 
+    def webdataset_preprocessors(self, extras: Extras):
         # CUSTOM CAPTIONS GETTER -----
         def get_caption(oc, c, p_og=0.05):  # cog_contexual, cog_caption
             if p_og > 0 and np.random.rand() < p_og and len(oc) > 0:
-                return identity(oc)
+                return self.base_identity(oc)
             else:
-                return identity(c)
+                return self.base_identity(c)
 
+        # TODO: not used?
         captions_getter = MultiGetter(rules={
             ('old_caption', 'caption'): lambda oc, c: get_caption(json.loads(oc)['og_caption'], c, p_og=0.05)
         })
@@ -86,38 +87,41 @@ class DataCore(WarpCore):
             ('jpg;png',
              torchvision.transforms.ToTensor() if self.config.multi_aspect_ratio is not None else extras.transforms,
              'images'),
-            ('txt', identity, 'captions') if self.config.captions_getter is None else (
+            ('txt', self.base_identity, 'captions') if self.config.captions_getter is None else (
                 self.config.captions_getter[0], eval(self.config.captions_getter[1]), 'captions'),
         ]
 
-    def setup_data(self, extras: Extras) -> WarpCore.Data:
+    def wds_identity(self, x):
+        return x
+    
+    def map_preprocessor(self, x):
+        result = {}
+        items = self.wa_preprocessor
+        for i, p in enumerate(items):
+            result[p[2]] = x[i]
+        return result
+
+    def setup_data(self, extras: Extras, dset_workers=8) -> WarpCore.Data:
         # SETUP DATASET
         dataset_path = self.webdataset_path()
         preprocessors = self.webdataset_preprocessors(extras)
-
+        self.wa_preprocessor = preprocessors
         handler = warn_and_continue
         dataset = wds.WebDataset(
             dataset_path, resampled=True, handler=handler
-        ).select(
-            MultiFilter(rules={
-                f[0]: eval(f[1]) for f in self.config.dataset_filters
-            }) if self.config.dataset_filters is not None else lambda _: True
         ).shuffle(690, handler=handler).decode(
             "pilrgb", handler=handler
         ).to_tuple(
             *[p[0] for p in preprocessors], handler=handler
         ).map_tuple(
             *[p[1] for p in preprocessors], handler=handler
-        ).map(lambda x: {p[2]: x[i] for i, p in enumerate(preprocessors)})
-
-        def identity(x):
-            return x
+        ).map(self.map_preprocessor)
 
         # SETUP DATALOADER
         real_batch_size = self.config.batch_size // (self.world_size * self.config.grad_accum_steps)
         dataloader = DataLoader(
-            dataset, batch_size=real_batch_size, num_workers=8, pin_memory=True,
-            collate_fn=identity if self.config.multi_aspect_ratio is not None else None
+            dataset, batch_size=real_batch_size, num_workers=dset_workers, pin_memory=True,
+            collate_fn=self.wds_identity if self.config.multi_aspect_ratio is not None else None
         )
         if self.is_main_node:
             print(f"Training with batch size {self.config.batch_size} ({real_batch_size}/GPU)")
