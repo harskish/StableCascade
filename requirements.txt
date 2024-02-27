@@ -17,4 +17,5 @@ einops>=0.7.0
 onnx2torch>=1.5.13
 warmup-scheduler @ git+https://github.com/ildoonet/pytorch-gradual-warmup-lr.git
 torchtools @ git+https://github.com/pabloppp/pytorch-tools
-diffusers @ git+https://github.com/kashif/diffusers.git@b3a80f7c699e4af5280ffaa1e448af22646be3b0
+diffusers @ git+https://github.com/kashif/diffusers.git@a3dc21385b7386beb3dab3a9845962ede6765887  # github.com/Stability-AI/StableCascade/issues/58#issuecomment-1949882396
+ipython>=8.22.1
